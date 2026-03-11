@@ -5,13 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/RohanAwhad/pr-review-bot/internal/logging"
 	"github.com/RohanAwhad/pr-review-bot/internal/normalize"
 	"github.com/RohanAwhad/pr-review-bot/internal/pipeline"
 	"github.com/RohanAwhad/pr-review-bot/internal/stage1"
@@ -31,6 +34,24 @@ func main() {
 	}
 	loadDotEnv(filepath.Join(wd, ".env"))
 
+	logger, logSink, logPath, err := logging.New("classify-pr")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "configure logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer logSink.Close()
+	slog.SetDefault(logger)
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			logger.Error("panic recovered", "panic", recovered, "stack", string(debug.Stack()))
+			os.Exit(1)
+		}
+	}()
+
+	id := runID()
+	runLogger := logger.With("run_id", id, "pr_url", prURL)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -38,22 +59,31 @@ func main() {
 	region := envOr("CLOUD_ML_REGION", "us-east5")
 	model := envOr("NORMALIZER_MODEL", "claude-haiku-4-5@20251001")
 	image := envOr("STAGE1_IMAGE", "pr-review-bot-stage1:latest")
+	runLogger.Info("starting classification", "image", image, "normalizer_model", model)
+
+	normalizer := normalize.New(ctx, region, project, model)
+	normalizer.Logger = runLogger
 
 	service := pipeline.Service{
 		Stage1: stage1.Runner{
 			Image:    image,
 			RepoRoot: wd,
+			Logger:   runLogger,
 		},
-		Normalizer:    normalize.New(ctx, region, project, model),
+		Normalizer:    normalizer,
 		MinConfidence: confidenceThreshold(),
+		Logger:        runLogger,
 	}
 
-	decision := service.Classify(ctx, prURL, runID())
+	decision := service.Classify(ctx, prURL, id)
+	runLogger.Info("classification completed", "classification", decision.Classification, "confidence", decision.Confidence)
 	out, err := json.MarshalIndent(decision, "", "  ")
 	if err != nil {
+		runLogger.Error("encode decision JSON", "error", err)
 		fmt.Fprintf(os.Stderr, "encode decision JSON: %v\n", err)
 		os.Exit(1)
 	}
+	runLogger.Debug("writing decision JSON to stdout", "log_path", logPath)
 	fmt.Println(string(out))
 }
 
