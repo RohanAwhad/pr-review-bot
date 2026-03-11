@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUN_ID="$(date +%Y%m%d_%H%M%S)"
+RUN_DIR="${ROOT_DIR}/logs/smoke/run-${RUN_ID}"
+KEEP_SMOKE_LOGS="${KEEP_SMOKE_LOGS:-0}"
+
+CASE_NAMES=("reward_hub_64" "new_math_mnist_9" "invalid_issue_url")
+CASE_URLS=(
+  "https://github.com/Red-Hat-AI-Innovation-Team/reward_hub/pull/64"
+  "https://github.com/RohanAwhad/new-math-mnist/pull/9"
+  "https://github.com/RohanAwhad/new-math-mnist/issues/9"
+)
+CASE_EXPECTED=("no_human" "human_required" "human_required")
+
+cleanup() {
+  if [[ "${KEEP_SMOKE_LOGS}" != "1" ]]; then
+    rm -rf "${RUN_DIR}"
+  else
+    echo "kept smoke logs at ${RUN_DIR}"
+  fi
+}
+trap cleanup EXIT
+
+mkdir -p "${RUN_DIR}"
+cd "${ROOT_DIR}"
+PIDS=()
+
+for i in "${!CASE_NAMES[@]}"; do
+  stdout_file="${RUN_DIR}/${CASE_NAMES[$i]}.stdout"
+  stderr_file="${RUN_DIR}/${CASE_NAMES[$i]}.stderr"
+  status_file="${RUN_DIR}/${CASE_NAMES[$i]}.exit"
+  (
+    go run ./cmd/classify-pr "${CASE_URLS[$i]}" >"${stdout_file}" 2>"${stderr_file}"
+    echo "$?" >"${status_file}"
+    exit 0
+  ) &
+  PIDS+=("$!")
+done
+
+for pid in "${PIDS[@]}"; do wait "${pid}"; done
+
+pass_count=0
+mismatch_count=0
+error_count=0
+
+for i in "${!CASE_NAMES[@]}"; do
+  name="${CASE_NAMES[$i]}"
+  expected="${CASE_EXPECTED[$i]}"
+  stdout_file="${RUN_DIR}/${name}.stdout"
+  stderr_file="${RUN_DIR}/${name}.stderr"
+  status_file="${RUN_DIR}/${name}.exit"
+  actual=""
+  status=""
+
+  if [[ ! -f "${status_file}" ]]; then
+    status="ERROR"
+    actual="missing-exit-code"
+    ((error_count+=1))
+  elif [[ "$(cat "${status_file}")" != "0" ]]; then
+    status="ERROR"
+    actual="command-failed"
+    ((error_count+=1))
+  else
+    actual="$(jq -r '.classification // empty' "${stdout_file}" 2>/dev/null || true)"
+    if [[ -z "${actual}" ]]; then
+      status="ERROR"
+      actual="invalid-json"
+      ((error_count+=1))
+    elif [[ "${actual}" == "${expected}" ]]; then
+      status="PASS"
+      ((pass_count+=1))
+    else
+      status="MISMATCH"
+      ((mismatch_count+=1))
+    fi
+  fi
+
+  echo "===== ${name} ====="
+  echo "URL: ${CASE_URLS[$i]}"
+  echo "Expected: ${expected}"
+  echo "Actual: ${actual}"
+  echo "Status: ${status}"
+  echo "--- Captured STDOUT ---"
+  cat "${stdout_file}"
+  echo "--- Captured STDERR ---"
+  cat "${stderr_file}"
+  echo
+done
+
+  echo "Summary: pass=${pass_count} mismatch=${mismatch_count} error=${error_count}"
+
+if [[ ${error_count} -gt 0 ]]; then exit 1; fi
