@@ -51,3 +51,5 @@ Output shape:
 - Stage-1 timeout is fixed at 30 minutes.
 - Confidence threshold defaults to `0.5` and can be overridden with `MIN_CONFIDENCE`.
 - Normalizer model defaults to `claude-haiku-4-5@20251001` and can be overridden with `NORMALIZER_MODEL`.
+- Logs are written to `logs/classify-pr.log` and mirrored to stderr.
+- `LOGGING_LEVEL` controls verbosity (`debug`, `info`, `warn`, `error`); default is `warn`.
