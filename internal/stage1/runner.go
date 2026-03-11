@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,11 +17,16 @@ const prompt = "You are stage-1 PR risk classifier. Analyze this checked-out PR 
 type Runner struct {
 	Image    string
 	RepoRoot string
+	Logger   *slog.Logger
 }
 
 func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, error) {
+	logger := r.logger().With("owner", pr.Owner, "repo", pr.Repo, "pr_number", pr.Number)
+	logger.Info("running stage-1 in podman", "image", r.Image)
+
 	home, err := os.UserHomeDir()
 	if err != nil {
+		logger.Error("resolve home directory", "error", err)
 		return "", fmt.Errorf("resolve home directory: %w", err)
 	}
 
@@ -55,7 +61,16 @@ func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, 
 	cmd.Stderr = &out
 	err = cmd.Run()
 	if err != nil {
+		logger.Error("stage-1 podman run failed", "error", err, "output", out.String())
 		return out.String(), fmt.Errorf("run stage-1 container: %w", err)
 	}
+	logger.Debug("stage-1 podman run completed", "output_len", out.Len())
 	return out.String(), nil
+}
+
+func (r Runner) logger() *slog.Logger {
+	if r.Logger != nil {
+		return r.Logger
+	}
+	return slog.Default()
 }
