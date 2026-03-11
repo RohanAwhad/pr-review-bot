@@ -62,7 +62,11 @@ for i in "${!CASE_NAMES[@]}"; do
   PIDS+=("$!")
 done
 
-for pid in "${PIDS[@]}"; do wait "${pid}"; done
+for pid in "${PIDS[@]}"; do
+  if ! wait "${pid}"; then
+    :
+  fi
+done
 
 pass_count=0
 mismatch_count=0

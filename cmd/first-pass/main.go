@@ -20,7 +20,7 @@ import (
 	"github.com/RohanAwhad/pr-review-bot/internal/stage1"
 )
 
-const firstPassPrompt = "You are stage-1 first-pass PR reviewer. Analyze the checked-out PR branch against main. Use only these git commands unless strictly necessary: git log main..HEAD, git diff --name-status main...HEAD, git diff --stat main...HEAD. Do NOT run full patch diff commands like git diff main...HEAD. Read only specific changed files you need. You may run installs/tests or fetch external repos only when needed to remove uncertainty. Keep output concise. End with these fields: INTENT_VERDICT, UNDERSTOOD_INTENT, INTENT_CONFIDENCE, INTENT_REASON, OPTIMALITY_VERDICT, OPTIMALITY_REASON, ALTERNATIVES, FOCUS_AREAS, BLOCKING_QUESTIONS."
+const firstPassPrompt = "You are stage-1 first-pass PR reviewer. Use only the attached context file (commits, changed files, and diff stat) to assess the PR. Do not run git commands or read repository files. You may use external references only when absolutely necessary to remove uncertainty. Keep output concise. End with these fields: INTENT_VERDICT, UNDERSTOOD_INTENT, INTENT_CONFIDENCE, INTENT_REASON, OPTIMALITY_VERDICT, OPTIMALITY_REASON, ALTERNATIVES, FOCUS_AREAS, BLOCKING_QUESTIONS."
 
 func main() {
 	if len(os.Args) != 2 {
