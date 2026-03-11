@@ -20,7 +20,7 @@ import (
 	"github.com/RohanAwhad/pr-review-bot/internal/stage1"
 )
 
-const firstPassPrompt = "You are stage-1 first-pass PR reviewer. Use only the attached context file (commits, changed files, and diff stat) to assess the PR. Do not run git commands or read repository files. You may use external references only when absolutely necessary to remove uncertainty. Keep output concise. End with these fields: INTENT_VERDICT, UNDERSTOOD_INTENT, INTENT_CONFIDENCE, INTENT_REASON, OPTIMALITY_VERDICT, OPTIMALITY_REASON, ALTERNATIVES, FOCUS_AREAS, BLOCKING_QUESTIONS."
+const firstPassPrompt = "You are stage-1 first-pass PR reviewer. Analyze this checked-out PR branch against main. First inspect commit history and changed-file list. Then read full contents of the key changed files (not just patch snippets) before deciding intent and optimality. You may run installs/tests and use external references when needed to remove uncertainty. Keep output concise. End with these fields: INTENT_VERDICT, UNDERSTOOD_INTENT, INTENT_CONFIDENCE, INTENT_REASON, OPTIMALITY_VERDICT, OPTIMALITY_REASON, ALTERNATIVES, FOCUS_AREAS, BLOCKING_QUESTIONS."
 
 func main() {
 	if len(os.Args) != 2 {
@@ -69,13 +69,12 @@ func main() {
 
 	service := pipeline.FirstPassService{
 		Stage1: stage1.Runner{
-			Image:          image,
-			RepoRoot:       wd,
-			Prompt:         firstPassPrompt,
-			Agent:          "build",
-			Model:          stage1Model,
-			UseContextFile: true,
-			Logger:         runLogger,
+			Image:    image,
+			RepoRoot: wd,
+			Prompt:   firstPassPrompt,
+			Agent:    "build",
+			Model:    stage1Model,
+			Logger:   runLogger,
 		},
 		Normalizer:    normalizer,
 		MinConfidence: confidenceThreshold(),
