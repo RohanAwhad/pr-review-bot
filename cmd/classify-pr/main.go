@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/RohanAwhad/pr-review-bot/internal/normalize"
@@ -26,6 +29,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "resolve working directory: %v\n", err)
 		os.Exit(1)
 	}
+	loadDotEnv(filepath.Join(wd, ".env"))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -33,7 +37,7 @@ func main() {
 	project := envOr("GOOGLE_CLOUD_PROJECT", os.Getenv("ANTHROPIC_VERTEX_PROJECT_ID"))
 	region := envOr("CLOUD_ML_REGION", "us-east5")
 	model := envOr("NORMALIZER_MODEL", "claude-haiku-4-5@20251001")
-	image := envOr("STAGE1_IMAGE", "ghcr.io/anomalyco/opencode:latest")
+	image := envOr("STAGE1_IMAGE", "pr-review-bot-stage1:latest")
 
 	service := pipeline.Service{
 		Stage1: stage1.Runner{
@@ -71,4 +75,35 @@ func envOr(key string, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func loadDotEnv(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		if key == "" || os.Getenv(key) != "" {
+			continue
+		}
+
+		value := strings.TrimSpace(parts[1])
+		value = strings.TrimPrefix(value, "\"")
+		value = strings.TrimSuffix(value, "\"")
+		_ = os.Setenv(key, value)
+	}
 }
