@@ -6,13 +6,35 @@ RUN_ID="$(date +%Y%m%d_%H%M%S)"
 RUN_DIR="${ROOT_DIR}/logs/smoke/run-${RUN_ID}"
 KEEP_SMOKE_LOGS="${KEEP_SMOKE_LOGS:-0}"
 
-CASE_NAMES=("reward_hub_64" "new_math_mnist_9" "invalid_issue_url")
+CASE_NAMES=(
+  "reward_hub_64"
+  "new_math_mnist_9"
+  "invalid_issue_url"
+  "first_pass_new_math_mnist_9"
+  "first_pass_agentic_rl_1"
+)
+CASE_COMMANDS=(
+  "classify-pr"
+  "classify-pr"
+  "classify-pr"
+  "first-pass"
+  "first-pass"
+)
 CASE_URLS=(
   "https://github.com/Red-Hat-AI-Innovation-Team/reward_hub/pull/64"
   "https://github.com/RohanAwhad/new-math-mnist/pull/9"
   "https://github.com/RohanAwhad/new-math-mnist/issues/9"
+  "https://github.com/RohanAwhad/new-math-mnist/pull/9"
+  "https://github.com/RohanAwhad/agentic-rl/pull/1"
 )
-CASE_EXPECTED=("no_human" "human_required" "human_required")
+CASE_EXPECTED=("no_human" "human_required" "human_required" "ready_to_merge" "wip")
+CASE_JSON_FIELDS=(
+  "classification"
+  "classification"
+  "classification"
+  "merge_readiness"
+  "merge_readiness"
+)
 
 cleanup() {
   if [[ "${KEEP_SMOKE_LOGS}" != "1" ]]; then
@@ -31,15 +53,20 @@ for i in "${!CASE_NAMES[@]}"; do
   stdout_file="${RUN_DIR}/${CASE_NAMES[$i]}.stdout"
   stderr_file="${RUN_DIR}/${CASE_NAMES[$i]}.stderr"
   status_file="${RUN_DIR}/${CASE_NAMES[$i]}.exit"
+  command_name="${CASE_COMMANDS[$i]}"
   (
-    go run ./cmd/classify-pr "${CASE_URLS[$i]}" >"${stdout_file}" 2>"${stderr_file}"
+    go run "./cmd/${command_name}" "${CASE_URLS[$i]}" >"${stdout_file}" 2>"${stderr_file}"
     echo "$?" >"${status_file}"
     exit 0
   ) &
   PIDS+=("$!")
 done
 
-for pid in "${PIDS[@]}"; do wait "${pid}"; done
+for pid in "${PIDS[@]}"; do
+  if ! wait "${pid}"; then
+    :
+  fi
+done
 
 pass_count=0
 mismatch_count=0
@@ -48,6 +75,7 @@ error_count=0
 for i in "${!CASE_NAMES[@]}"; do
   name="${CASE_NAMES[$i]}"
   expected="${CASE_EXPECTED[$i]}"
+  json_field="${CASE_JSON_FIELDS[$i]}"
   stdout_file="${RUN_DIR}/${name}.stdout"
   stderr_file="${RUN_DIR}/${name}.stderr"
   status_file="${RUN_DIR}/${name}.exit"
@@ -63,7 +91,7 @@ for i in "${!CASE_NAMES[@]}"; do
     actual="command-failed"
     ((error_count+=1))
   else
-    actual="$(jq -r '.classification // empty' "${stdout_file}" 2>/dev/null || true)"
+    actual="$(jq -r --arg field "${json_field}" '.[$field] // empty' "${stdout_file}" 2>/dev/null || true)"
     if [[ -z "${actual}" ]]; then
       status="ERROR"
       actual="invalid-json"
@@ -78,7 +106,9 @@ for i in "${!CASE_NAMES[@]}"; do
   fi
 
   echo "===== ${name} ====="
+  echo "Command: ${CASE_COMMANDS[$i]}"
   echo "URL: ${CASE_URLS[$i]}"
+  echo "JSON field: ${json_field}"
   echo "Expected: ${expected}"
   echo "Actual: ${actual}"
   echo "Status: ${status}"
