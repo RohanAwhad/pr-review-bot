@@ -29,7 +29,7 @@ func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, 
 		adcPath = filepath.Join(home, ".config", "gcloud", "application_default_credentials.json")
 	}
 
-	script := `set -eu; apk add --no-cache git github-cli >/dev/null; path=${PR_URL#https://github.com/}; owner_repo=${path%%/pull/*}; pr_number=${path##*/}; repo_name=${owner_repo##*/}; mkdir -p /work && cd /work; git clone "https://x-access-token:${GITHUB_ACCESS_TOKEN}@github.com/${owner_repo}.git" "$repo_name" >/dev/null 2>&1; cd "$repo_name"; git fetch origin "pull/${pr_number}/head:pr-${pr_number}" >/dev/null 2>&1; git checkout "pr-${pr_number}" >/dev/null 2>&1; opencode run "$STAGE1_PROMPT" --agent auto-accept --dir "/work/$repo_name"`
+	script := `set -eu; apk add --no-cache git github-cli >/dev/null; owner_repo="${PR_OWNER}/${PR_REPO}"; pr_number="${PR_NUMBER}"; repo_name="${PR_REPO}"; mkdir -p /work && cd /work; git clone "https://x-access-token:${GITHUB_ACCESS_TOKEN}@github.com/${owner_repo}.git" "$repo_name" >/dev/null 2>&1; cd "$repo_name"; git fetch origin "pull/${pr_number}/head:pr-${pr_number}" >/dev/null 2>&1; git checkout "pr-${pr_number}" >/dev/null 2>&1; opencode run "$STAGE1_PROMPT" --agent auto-accept --dir "/work/$repo_name"`
 
 	args := []string{
 		"run", "--rm", "--entrypoint", "sh",
@@ -40,7 +40,9 @@ func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, 
 		"-e", "GOOGLE_CLOUD_PROJECT",
 		"-e", "VERTEX_LOCATION",
 		"-e", "GOOGLE_CLOUD_LOCATION",
-		"-e", "PR_URL=" + pr.URL,
+		"-e", "PR_OWNER=" + pr.Owner,
+		"-e", "PR_REPO=" + pr.Repo,
+		"-e", "PR_NUMBER=" + pr.Number,
 		"-e", "STAGE1_PROMPT=" + prompt,
 		"-v", filepath.Join(r.RepoRoot, ".config", "opencode") + ":/root/.config/opencode:ro",
 		"-v", filepath.Join(home, ".local", "share", "opencode", "auth.json") + ":/root/.local/share/opencode/auth.json:ro",
