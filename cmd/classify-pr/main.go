@@ -59,7 +59,8 @@ func main() {
 	region := envOr("CLOUD_ML_REGION", "us-east5")
 	model := envOr("NORMALIZER_MODEL", "claude-haiku-4-5@20251001")
 	image := envOr("PR_REVIEW_BOT_STAGE1_IMAGE", envOr("STAGE1_IMAGE", "pr-review-bot-stage1:latest"))
-	runLogger.Info("starting classification", "image", image, "normalizer_model", model)
+	stage1Model := os.Getenv("STAGE1_MODEL")
+	runLogger.Info("starting classification", "image", image, "normalizer_model", model, "stage1_model", stage1Model)
 
 	normalizer := normalize.New(ctx, region, project, model)
 	normalizer.Logger = runLogger
@@ -68,6 +69,7 @@ func main() {
 		Stage1: stage1.Runner{
 			Image:    image,
 			RepoRoot: wd,
+			Model:    stage1Model,
 			Logger:   runLogger,
 		},
 		Normalizer:    normalizer,
