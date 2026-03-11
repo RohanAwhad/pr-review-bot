@@ -33,6 +33,8 @@ STAGE1_IMAGE=pr-review-bot-stage1:latest \
 ./bin/classify-pr "https://github.com/RohanAwhad/new-math-mnist/pull/9"
 ```
 
+If `STAGE1_IMAGE` is not set, the CLI defaults to `pr-review-bot-stage1:latest`.
+
 Output shape:
 
 ```json

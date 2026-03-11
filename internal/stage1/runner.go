@@ -29,7 +29,7 @@ func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, 
 		adcPath = filepath.Join(home, ".config", "gcloud", "application_default_credentials.json")
 	}
 
-	script := `set -eu; apk add --no-cache git github-cli >/dev/null; owner_repo="${PR_REVIEW_BOT_PR_OWNER}/${PR_REVIEW_BOT_PR_REPO}"; pr_number="${PR_REVIEW_BOT_PR_NUMBER}"; repo_name="${PR_REVIEW_BOT_PR_REPO}"; mkdir -p /work && cd /work; git clone "https://x-access-token:${GITHUB_ACCESS_TOKEN}@github.com/${owner_repo}.git" "$repo_name" >/dev/null 2>&1; cd "$repo_name"; git fetch origin "pull/${pr_number}/head:pr-${pr_number}" >/dev/null 2>&1; git checkout "pr-${pr_number}" >/dev/null 2>&1; opencode run "$PR_REVIEW_BOT_STAGE1_PROMPT" --agent auto-accept --dir "/work/$repo_name"`
+	script := `set -eu; owner_repo="${PR_REVIEW_BOT_PR_OWNER}/${PR_REVIEW_BOT_PR_REPO}"; pr_number="${PR_REVIEW_BOT_PR_NUMBER}"; repo_name="${PR_REVIEW_BOT_PR_REPO}"; mkdir -p /work && cd /work; git clone "https://x-access-token:${GITHUB_ACCESS_TOKEN}@github.com/${owner_repo}.git" "$repo_name" >/dev/null 2>&1; cd "$repo_name"; git fetch origin "pull/${pr_number}/head:pr-${pr_number}" >/dev/null 2>&1; git checkout "pr-${pr_number}" >/dev/null 2>&1; opencode run "$PR_REVIEW_BOT_STAGE1_PROMPT" --agent auto-accept --dir "/work/$repo_name"`
 
 	args := []string{
 		"run", "--rm", "--entrypoint", "sh",

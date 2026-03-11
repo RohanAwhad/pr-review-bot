@@ -41,8 +41,7 @@ func (s Service) Classify(ctx context.Context, prURL string, runID string) class
 	}
 
 	if decision.Reason == "" {
-		decision.Reason = "stage-2 returned empty reason"
-		decision.Classification = classifier.ClassificationHumanRequired
+		return fallback(runID, "stage-2 returned empty reason")
 	}
 
 	return decision
