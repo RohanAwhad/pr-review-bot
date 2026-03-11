@@ -3,6 +3,7 @@
 Phase 0 implements:
 - Input: GitHub PR URL
 - Output: JSON classification (`human_required` or `no_human`)
+- Output: JSON first-pass review (`ready_to_merge`, `wip`, or `needs_human_review`)
 
 Architecture:
 - Stage 1 (inside Podman): `opencode` (Opus 4.6) reviews checked-out PR
@@ -35,7 +36,44 @@ PR_REVIEW_BOT_STAGE1_IMAGE=pr-review-bot-stage1:latest \
 
 If `PR_REVIEW_BOT_STAGE1_IMAGE` is not set, the CLI falls back to `STAGE1_IMAGE`, then `pr-review-bot-stage1:latest`.
 
-Output shape:
+## Run first-pass review
+
+```bash
+PR_REVIEW_BOT_STAGE1_IMAGE=pr-review-bot-stage1:latest \
+./bin/first-pass "https://github.com/RohanAwhad/new-math-mnist/pull/9"
+```
+
+First-pass output shape:
+
+```json
+{
+  "intent_understanding": {
+    "verdict": "yes",
+    "confidence": 0.92,
+    "reason": "Intent is explicit in commit and diff history",
+    "understood_intent": "Migrate project to package-first API and update docs/tests accordingly"
+  },
+  "optimality": {
+    "verdict": "acceptable",
+    "reason": "Approach is mostly sound but leaves one follow-up refactor",
+    "alternatives": ["Move dataset loader to dedicated module in this PR"]
+  },
+  "merge_readiness": "wip",
+  "focus_areas": [
+    {
+      "path": "new_math_ops/dataset.py",
+      "why": "Still re-exports from evaluate module",
+      "priority": "medium"
+    }
+  ],
+  "blocking_questions": [
+    "Is removing top-level compatibility shims approved for this release?"
+  ],
+  "run_id": "run-1741740000-123456"
+}
+```
+
+Classifier output shape:
 
 ```json
 {
@@ -65,5 +103,6 @@ KEEP_SMOKE_LOGS=1 ./scripts/smoke_phase0.sh
 - Stage-1 timeout is fixed at 30 minutes.
 - Confidence threshold defaults to `0.5` and can be overridden with `MIN_CONFIDENCE`.
 - Normalizer model defaults to `claude-haiku-4-5@20251001` and can be overridden with `NORMALIZER_MODEL`.
-- Logs are written to `logs/classify-pr.log` and mirrored to stderr.
+- Stage-1 model can be overridden with `STAGE1_MODEL` (otherwise OpenCode config default is used).
+- Logs are written to `logs/classify-pr.log` and `logs/first-pass.log`, mirrored to stderr.
 - `LOGGING_LEVEL` controls verbosity (`debug`, `info`, `warn`, `error`); default is `warn`.

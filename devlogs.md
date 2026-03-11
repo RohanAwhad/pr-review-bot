@@ -23,3 +23,12 @@
 - Added `scripts/smoke_phase0.sh` to run 3 classification smoke tests in parallel.
 - Captured each run to separate files, then printed section-wise output summaries.
 - Added auto-cleanup for smoke artifacts with optional `KEEP_SMOKE_LOGS=1` retention.
+- Expanded smoke coverage to include `first-pass` expectations for `new-math-mnist#9` and `agentic-rl#1`.
+
+## 2026-03-11 - First-pass review pipeline
+
+- Added `first-pass` CLI to generate initial PR review output from a GitHub PR URL.
+- Added stage-2 normalizer schema for intent understanding, optimality verdict, focus areas, and blocking questions.
+- Added deterministic merge readiness policy: low confidence/errors => `needs_human_review`, otherwise route to `wip` or `ready_to_merge`.
+- Added stage-1 runner options for model override (`STAGE1_MODEL`) and context-file mode used by first-pass.
+- Added unit tests for first-pass routing logic and fallback behavior.

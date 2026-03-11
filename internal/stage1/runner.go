@@ -12,12 +12,16 @@ import (
 	"github.com/RohanAwhad/pr-review-bot/internal/classifier"
 )
 
-const prompt = "You are stage-1 PR risk classifier. Analyze this checked-out PR branch against main and classify if HUMAN review is required. DO NOT run installs/tests. Only inspect git history, diff, and changed files. End with exactly: CLASSIFICATION: human_required|no_human then CONFIDENCE: <0-1> then REASON: <one sentence>."
+const DefaultPrompt = "You are stage-1 PR risk classifier. Analyze this checked-out PR branch against main and classify if HUMAN review is required. DO NOT run installs/tests. Only inspect git history, diff, and changed files. End with exactly: CLASSIFICATION: human_required|no_human then CONFIDENCE: <0-1> then REASON: <one sentence>."
 
 type Runner struct {
-	Image    string
-	RepoRoot string
-	Logger   *slog.Logger
+	Image          string
+	RepoRoot       string
+	Prompt         string
+	Agent          string
+	Model          string
+	UseContextFile bool
+	Logger         *slog.Logger
 }
 
 func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, error) {
@@ -35,7 +39,7 @@ func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, 
 		adcPath = filepath.Join(home, ".config", "gcloud", "application_default_credentials.json")
 	}
 
-	script := `set -eu; owner_repo="${PR_REVIEW_BOT_PR_OWNER}/${PR_REVIEW_BOT_PR_REPO}"; pr_number="${PR_REVIEW_BOT_PR_NUMBER}"; repo_name="${PR_REVIEW_BOT_PR_REPO}"; mkdir -p /work && cd /work; git clone "https://x-access-token:${GITHUB_ACCESS_TOKEN}@github.com/${owner_repo}.git" "$repo_name" >/dev/null 2>&1; cd "$repo_name"; git fetch origin "pull/${pr_number}/head:pr-${pr_number}" >/dev/null 2>&1; git checkout "pr-${pr_number}" >/dev/null 2>&1; opencode run "$PR_REVIEW_BOT_STAGE1_PROMPT" --agent auto-accept --dir "/work/$repo_name"`
+	script := `set -eu; owner_repo="${PR_REVIEW_BOT_PR_OWNER}/${PR_REVIEW_BOT_PR_REPO}"; pr_number="${PR_REVIEW_BOT_PR_NUMBER}"; repo_name="${PR_REVIEW_BOT_PR_REPO}"; mkdir -p /work && cd /work; git clone "https://x-access-token:${GITHUB_ACCESS_TOKEN}@github.com/${owner_repo}.git" "$repo_name" >/dev/null 2>&1; cd "$repo_name"; git fetch origin "pull/${pr_number}/head:pr-${pr_number}" >/dev/null 2>&1; git checkout "pr-${pr_number}" >/dev/null 2>&1; if [ "$PR_REVIEW_BOT_STAGE1_USE_CONTEXT_FILE" = "1" ]; then context_file="/tmp/pr-review-context.txt"; { printf "COMMITS\n"; git log --oneline main..HEAD 2>/dev/null || git log --oneline origin/main..HEAD 2>/dev/null || true; printf "\nCHANGED_FILES\n"; git diff --name-status main...HEAD 2>/dev/null || git diff --name-status origin/main...HEAD 2>/dev/null || true; printf "\nDIFF_STAT\n"; git diff --stat main...HEAD 2>/dev/null || git diff --stat origin/main...HEAD 2>/dev/null || true; } > "$context_file"; if [ -n "$PR_REVIEW_BOT_STAGE1_MODEL" ]; then opencode run "$PR_REVIEW_BOT_STAGE1_PROMPT" -f "$context_file" --model "$PR_REVIEW_BOT_STAGE1_MODEL" --print-logs=false --agent "$PR_REVIEW_BOT_STAGE1_AGENT" --dir "/tmp"; else opencode run "$PR_REVIEW_BOT_STAGE1_PROMPT" -f "$context_file" --print-logs=false --agent "$PR_REVIEW_BOT_STAGE1_AGENT" --dir "/tmp"; fi; else if [ -n "$PR_REVIEW_BOT_STAGE1_MODEL" ]; then opencode run "$PR_REVIEW_BOT_STAGE1_PROMPT" --model "$PR_REVIEW_BOT_STAGE1_MODEL" --print-logs=false --agent "$PR_REVIEW_BOT_STAGE1_AGENT" --dir "/work/$repo_name"; else opencode run "$PR_REVIEW_BOT_STAGE1_PROMPT" --print-logs=false --agent "$PR_REVIEW_BOT_STAGE1_AGENT" --dir "/work/$repo_name"; fi; fi`
 
 	args := []string{
 		"run", "--rm", "--entrypoint", "sh",
@@ -49,7 +53,10 @@ func (r Runner) Run(ctx context.Context, pr classifier.PullRequestRef) (string, 
 		"-e", "PR_REVIEW_BOT_PR_OWNER=" + pr.Owner,
 		"-e", "PR_REVIEW_BOT_PR_REPO=" + pr.Repo,
 		"-e", "PR_REVIEW_BOT_PR_NUMBER=" + pr.Number,
-		"-e", "PR_REVIEW_BOT_STAGE1_PROMPT=" + prompt,
+		"-e", "PR_REVIEW_BOT_STAGE1_PROMPT=" + r.prompt(),
+		"-e", "PR_REVIEW_BOT_STAGE1_AGENT=" + r.agent(),
+		"-e", "PR_REVIEW_BOT_STAGE1_MODEL=" + r.model(),
+		"-e", "PR_REVIEW_BOT_STAGE1_USE_CONTEXT_FILE=" + r.useContextFile(),
 		"-v", filepath.Join(r.RepoRoot, ".config", "opencode") + ":/root/.config/opencode:ro",
 		"-v", filepath.Join(home, ".local", "share", "opencode", "auth.json") + ":/root/.local/share/opencode/auth.json:ro",
 		"-v", adcPath + ":/root/.config/gcloud/application_default_credentials.json:ro",
@@ -75,4 +82,29 @@ func (r Runner) logger() *slog.Logger {
 		return r.Logger
 	}
 	return slog.Default()
+}
+
+func (r Runner) prompt() string {
+	if r.Prompt != "" {
+		return r.Prompt
+	}
+	return DefaultPrompt
+}
+
+func (r Runner) agent() string {
+	if r.Agent != "" {
+		return r.Agent
+	}
+	return "auto-accept"
+}
+
+func (r Runner) model() string {
+	return r.Model
+}
+
+func (r Runner) useContextFile() string {
+	if r.UseContextFile {
+		return "1"
+	}
+	return "0"
 }
