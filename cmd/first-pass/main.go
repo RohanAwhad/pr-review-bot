@@ -20,9 +20,11 @@ import (
 	"github.com/RohanAwhad/pr-review-bot/internal/stage1"
 )
 
+const firstPassPrompt = "You are stage-1 first-pass PR reviewer. Analyze this checked-out PR branch against main. First inspect commit history and changed-file list. Then read full contents of the key changed files (not just patch snippets) before deciding intent and optimality. You may run installs/tests and use external references when needed to remove uncertainty. Keep output concise. End with these fields: INTENT_VERDICT, UNDERSTOOD_INTENT, INTENT_CONFIDENCE, INTENT_REASON, OPTIMALITY_VERDICT, OPTIMALITY_REASON, ALTERNATIVES, FOCUS_AREAS, BLOCKING_QUESTIONS."
+
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "usage: classify-pr <github-pr-url>\n")
+		fmt.Fprintf(os.Stderr, "usage: first-pass <github-pr-url>\n")
 		os.Exit(2)
 	}
 	prURL := os.Args[1]
@@ -34,7 +36,7 @@ func main() {
 	}
 	loadDotEnv(filepath.Join(wd, ".env"))
 
-	logger, logSink, logPath, err := logging.New("classify-pr")
+	logger, logSink, logPath, err := logging.New("first-pass")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "configure logger: %v\n", err)
 		os.Exit(1)
@@ -60,15 +62,17 @@ func main() {
 	model := envOr("NORMALIZER_MODEL", "claude-haiku-4-5@20251001")
 	image := envOr("PR_REVIEW_BOT_STAGE1_IMAGE", envOr("STAGE1_IMAGE", "pr-review-bot-stage1:latest"))
 	stage1Model := os.Getenv("STAGE1_MODEL")
-	runLogger.Info("starting classification", "image", image, "normalizer_model", model, "stage1_model", stage1Model)
+	runLogger.Info("starting first-pass review", "image", image, "normalizer_model", model, "stage1_model", stage1Model)
 
-	normalizer := normalize.New(ctx, region, project, model)
+	normalizer := normalize.NewFirstPass(ctx, region, project, model)
 	normalizer.Logger = runLogger
 
-	service := pipeline.Service{
+	service := pipeline.FirstPassService{
 		Stage1: stage1.Runner{
 			Image:    image,
 			RepoRoot: wd,
+			Prompt:   firstPassPrompt,
+			Agent:    "build",
 			Model:    stage1Model,
 			Logger:   runLogger,
 		},
@@ -77,15 +81,16 @@ func main() {
 		Logger:        runLogger,
 	}
 
-	decision := service.Classify(ctx, prURL, id)
-	runLogger.Info("classification completed", "classification", decision.Classification, "confidence", decision.Confidence)
-	out, err := json.MarshalIndent(decision, "", "  ")
+	review := service.Review(ctx, prURL, id)
+	runLogger.Info("first-pass review completed", "merge_readiness", review.MergeReadiness, "intent_verdict", review.IntentUnderstanding.Verdict, "optimality_verdict", review.Optimality.Verdict)
+
+	out, err := json.MarshalIndent(review, "", "  ")
 	if err != nil {
-		runLogger.Error("encode decision JSON", "error", err)
-		fmt.Fprintf(os.Stderr, "encode decision JSON: %v\n", err)
+		runLogger.Error("encode review JSON", "error", err)
+		fmt.Fprintf(os.Stderr, "encode review JSON: %v\n", err)
 		os.Exit(1)
 	}
-	runLogger.Debug("writing decision JSON to stdout", "log_path", logPath)
+	runLogger.Debug("writing first-pass review JSON to stdout", "log_path", logPath)
 	fmt.Println(string(out))
 }
 
