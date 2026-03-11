@@ -7,6 +7,16 @@
         "headers": {
           "anthropic-beta": "context-1m-2025-08-07"
         }
+      },
+      "models": {
+        "claude-opus-4-6@default": {
+          "options": {
+            "thinking": {
+              "type": "adaptive"
+            },
+            "effort": "max"
+          }
+        }
       }
     }
   }
