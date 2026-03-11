@@ -17,3 +17,9 @@
 - Added structured logging with stderr + file sinks at `logs/classify-pr.log`.
 - Added `LOGGING_LEVEL` support with default `warn` and optional `debug|info|warn|error`.
 - Added pipeline/stage-1/stage-2 logging for failures and fallback decisions.
+
+## 2026-03-11 - Smoke test runner
+
+- Added `scripts/smoke_phase0.sh` to run 3 classification smoke tests in parallel.
+- Captured each run to separate files, then printed section-wise output summaries.
+- Added auto-cleanup for smoke artifacts with optional `KEEP_SMOKE_LOGS=1` retention.

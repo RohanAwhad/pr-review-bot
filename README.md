@@ -46,6 +46,20 @@ Output shape:
 }
 ```
 
+## Run smoke tests
+
+```bash
+./scripts/smoke_phase0.sh
+```
+
+This runs 3 classification smoke cases in parallel, captures each output separately, then prints section-wise results.
+
+By default, temporary smoke outputs are deleted after the run. Keep them for debugging with:
+
+```bash
+KEEP_SMOKE_LOGS=1 ./scripts/smoke_phase0.sh
+```
+
 ## Notes
 
 - Stage-1 timeout is fixed at 30 minutes.
