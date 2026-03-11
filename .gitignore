@@ -1,0 +1,6 @@
+.env
+bin/
+dist/
+logs/
+*.out
+*.test
