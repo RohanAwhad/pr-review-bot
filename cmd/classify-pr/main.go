@@ -37,7 +37,7 @@ func main() {
 	project := envOr("GOOGLE_CLOUD_PROJECT", os.Getenv("ANTHROPIC_VERTEX_PROJECT_ID"))
 	region := envOr("CLOUD_ML_REGION", "us-east5")
 	model := envOr("NORMALIZER_MODEL", "claude-haiku-4-5@20251001")
-	image := envOr("STAGE1_IMAGE", "pr-review-bot-stage1:latest")
+	image := envOr("PR_REVIEW_BOT_STAGE1_IMAGE", envOr("STAGE1_IMAGE", "pr-review-bot-stage1:latest"))
 
 	service := pipeline.Service{
 		Stage1: stage1.Runner{
@@ -62,10 +62,10 @@ func runID() string {
 }
 
 func confidenceThreshold() float64 {
-	value := envOr("MIN_CONFIDENCE", "0.65")
+	value := envOr("MIN_CONFIDENCE", "0.5")
 	v, err := strconv.ParseFloat(value, 64)
 	if err != nil || v < 0 || v > 1 {
-		return 0.65
+		return 0.5
 	}
 	return v
 }

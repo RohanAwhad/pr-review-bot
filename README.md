@@ -29,11 +29,11 @@ The repository-scoped OpenCode config lives in `.config/opencode`.
 ## Run classifier
 
 ```bash
-STAGE1_IMAGE=pr-review-bot-stage1:latest \
+PR_REVIEW_BOT_STAGE1_IMAGE=pr-review-bot-stage1:latest \
 ./bin/classify-pr "https://github.com/RohanAwhad/new-math-mnist/pull/9"
 ```
 
-If `STAGE1_IMAGE` is not set, the CLI defaults to `pr-review-bot-stage1:latest`.
+If `PR_REVIEW_BOT_STAGE1_IMAGE` is not set, the CLI falls back to `STAGE1_IMAGE`, then `pr-review-bot-stage1:latest`.
 
 Output shape:
 
@@ -49,5 +49,5 @@ Output shape:
 ## Notes
 
 - Stage-1 timeout is fixed at 30 minutes.
-- Confidence threshold defaults to `0.65` and can be overridden with `MIN_CONFIDENCE`.
+- Confidence threshold defaults to `0.5` and can be overridden with `MIN_CONFIDENCE`.
 - Normalizer model defaults to `claude-haiku-4-5@20251001` and can be overridden with `NORMALIZER_MODEL`.
